@@ -1,45 +1,46 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using BloggerWebApi.Interfaces;
+using BloggerWebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        new MySqlServerVersion(new Version(8, 0, 41))
-    )
-);
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
 
-builder.Services.AddControllers();
 builder.Services.AddCors(options =>
-    options.AddPolicy("AllowReactApp", policy =>
-        policy.WithOrigins("http://localhost:5173").AllowAnyHeader().AllowAnyMethod()
-    )
-);
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        Title = "Blogger API",
-        Version = "v1"
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
+builder.Services.AddControllers();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
+        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddScoped<IPostService, PostServiceRawSql>();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
-app.UseHttpsRedirection();
-app.UseCors("AllowReactApp");
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<AppDbContext>();
+    DbInitializer.Seed(context);
+}
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Blogger API v1");
-    });
+    app.UseSwaggerUI();
 }
 
+app.UseCors("AllowFrontend");
+app.UseAuthorization();
 app.MapControllers();
 app.Run();

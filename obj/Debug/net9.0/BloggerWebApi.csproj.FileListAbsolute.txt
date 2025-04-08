@@ -286,3 +286,4 @@ D:\Desktop\ex\VSCode workspace\BloggerWebApi\bin\Debug\net9.0\Pomelo.EntityFrame
 D:\Desktop\ex\VSCode workspace\BloggerWebApi\bin\Debug\net9.0\Swashbuckle.AspNetCore.Swagger.dll
 D:\Desktop\ex\VSCode workspace\BloggerWebApi\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 D:\Desktop\ex\VSCode workspace\BloggerWebApi\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\Desktop\ex\VSCode workspace\BloggerWebApi\obj\Debug\net9.0\BloggerWebApi.sourcelink.json
