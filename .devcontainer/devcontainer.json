@@ -1,0 +1,14 @@
+{
+    "name": "BloggerWebApi DevContainer",
+    "dockerComposeFile": [
+        "docker-compose.yml"
+    ],
+    "service": "api",
+    "workspaceFolder": "/app",
+    "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-docker"
+    ],
+    "forwardPorts": [5173],
+    "postCreateCommand": "dotnet restore"
+}

@@ -31,8 +31,9 @@ public class PostService(AppDbContext context) : IPostService
 
     public async Task<Post> CreateAsync(Post post)
     {
-        post.CreatedDate = DateTime.UtcNow;
-        post.LastModifiedDate = DateTime.UtcNow;
+        DateTime date = DateTime.UtcNow;
+        post.CreatedDate = date;
+        post.LastModifiedDate = date;
         context.Posts.Add(post);
         await context.SaveChangesAsync();
         return post;

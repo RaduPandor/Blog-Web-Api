@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: my-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+  api:
+    build:
+      context: .
+    container_name: webapi
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5173:80"
+    depends_on:
+      - mysql
+    volumes:
+      - .:/app
+    restart: always
+volumes:
+  mysql_data:
