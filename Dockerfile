@@ -14,9 +14,6 @@ FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
-RUN dotnet tool install --global dotnet-ef
-ENV PATH="$PATH:/root/.dotnet/tools"
-
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

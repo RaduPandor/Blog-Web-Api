@@ -39,27 +39,24 @@ public class PostService(AppDbContext context) : IPostService
         return post;
     }
 
-    public async Task<PostPreviewDto?> UpdateAsync(int id, Post updatedPost)
+    public async Task<Post?> UpdateAsync(int id, Post updatedPost)
     {
         var existingPost = await context.Posts.FindAsync(id);
-        if (existingPost == null){
+        if (existingPost == null)
+        {
             return null;
-        }      
+        }
+
         existingPost.Title = updatedPost.Title;
         existingPost.Author = updatedPost.Author;
         existingPost.Content = updatedPost.Content;
         existingPost.LastModifiedDate = DateTime.UtcNow;
+
         await context.SaveChangesAsync();
-        return new PostPreviewDto
-        {
-            Id = existingPost.Id,
-            Title = existingPost.Title,
-            Author = existingPost.Author,
-            ContentPreview = existingPost.Content.Length > 20 ? existingPost.Content.Substring(0, 20) + "..." : existingPost.Content,
-            CreatedDate = existingPost.CreatedDate,
-            LastModifiedDate = existingPost.LastModifiedDate
-        };
+
+        return existingPost;
     }
+
 
 
     public async Task<bool> DeleteAsync(int id)

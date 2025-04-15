@@ -4,10 +4,10 @@ services:
     image: mysql:8.0
     container_name: my-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mydb
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
   api:
@@ -18,8 +18,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
     ports:
       - "5173:80"
-    depends_on:
-      - mysql
     volumes:
       - .:/app
     restart: always

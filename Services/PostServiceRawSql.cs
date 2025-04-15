@@ -63,7 +63,7 @@ namespace BloggerWebApi.Services
             return post;
         }
 
-        public async Task<PostPreviewDto?> UpdateAsync(int id, Post updatedPost)
+        public async Task<Post?> UpdateAsync(int id, Post updatedPost)
         {
             var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate WHERE Id = @Id";
             
@@ -74,28 +74,17 @@ namespace BloggerWebApi.Services
                 new MySqlParameter("@LastModifiedDate", DateTime.UtcNow),
                 new MySqlParameter("@Id", id));
 
-            if (rowsAffected == 0){
+            if (rowsAffected == 0)
+            {
                 return null;
             } 
+
             var updatedPostFromDb = await context.Posts
                 .Where(p => p.Id == id)
                 .FirstOrDefaultAsync();
 
-            if (updatedPostFromDb == null){
-                return null;
-            } 
-
-            return new PostPreviewDto
-            {
-                Id = updatedPostFromDb.Id,
-                Title = updatedPostFromDb.Title,
-                Author = updatedPostFromDb.Author,
-                ContentPreview = updatedPostFromDb.Content.Length > 20 ? updatedPostFromDb.Content.Substring(0, 20) + "..." : updatedPostFromDb.Content,
-                CreatedDate = updatedPostFromDb.CreatedDate,
-                LastModifiedDate = updatedPostFromDb.LastModifiedDate
-            };
+            return updatedPostFromDb;
         }
-
 
         public async Task<bool> DeleteAsync(int id)
         {
