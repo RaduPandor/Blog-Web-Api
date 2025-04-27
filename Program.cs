@@ -16,13 +16,13 @@ builder.Services.AddCors(options =>
     });
 });
 
+
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
 
 builder.Services.AddScoped<IPostService, PostService>();
-builder.Services.AddScoped<IPostService, PostServiceRawSql>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var app = builder.Build();

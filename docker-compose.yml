@@ -4,12 +4,15 @@ services:
     image: mysql:8.0
     container_name: my-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: P9l12&zD8A82G!(0z
+      MYSQL_DATABASE: blogapp
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - blogapp-network
+
   api:
     build:
       context: .
@@ -17,9 +20,15 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
     ports:
-      - "5173:80"
-    volumes:
-      - .:/app
-    restart: always
+      - "5174:8080"
+    depends_on:
+      - mysql
+    networks:
+      - blogapp-network
+
 volumes:
   mysql_data:
+
+networks:
+  blogapp-network:
+    driver: bridge

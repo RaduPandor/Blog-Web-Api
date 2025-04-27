@@ -13,9 +13,29 @@ namespace BloggerWebApi.Services
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
-            var query = "SELECT Id, Title, Author, SUBSTRING(Content, 1, 20) AS ContentPreview, CreatedDate, LastModifiedDate FROM Posts ORDER BY CreatedDate DESC";      
-            var posts = await context.PostPreviews.FromSqlRaw(query).ToListAsync();
-            return posts;
+            var sql = "SELECT Id, Title, Author, SUBSTRING(Content, 1, 20) AS ContentPreview, CreatedDate, LastModifiedDate FROM Posts ORDER BY CreatedDate DESC";      
+            await using var conn = context.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            var command = context.Database.GetDbConnection().CreateCommand();
+            command.CommandText = sql;
+            command.CommandType = CommandType.Text;
+            var list = new List<PostPreviewDto>();
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                list.Add(new PostPreviewDto
+                {
+                    Id               = reader.GetInt32(0),
+                    Title            = reader.GetString(1),
+                    Author           = reader.GetString(2),
+                    ContentPreview   = reader.GetString(3),
+                    CreatedDate      = reader.GetDateTime(4),
+                    LastModifiedDate = reader.GetDateTime(5)
+                });
+            }
+
+            return list;
         }
 
 

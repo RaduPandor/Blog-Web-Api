@@ -4,9 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BloggerWebApi.Services;
 
-public class PostService(AppDbContext context) : IPostService
+public class PostService : IPostService
 {
-    private readonly AppDbContext context = context;
+    private readonly AppDbContext context;
+   
+    public PostService(AppDbContext context)
+    {
+        this.context = context;
+    }
 
     public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
     {
