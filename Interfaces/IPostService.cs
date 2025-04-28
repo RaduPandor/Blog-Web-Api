@@ -1,5 +1,4 @@
 using BloggerWebApi.Dto;
-
 namespace BloggerWebApi.Interfaces;
 
 public interface IPostService
