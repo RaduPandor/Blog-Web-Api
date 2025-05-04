@@ -1,17 +1,24 @@
-version: "3.8"
 services:
   mysql:
     image: mysql:8.0
     container_name: my-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: P9l12&zD8A82G!(0z
+      MYSQL_ROOT_PASSWORD: blogpass123
       MYSQL_DATABASE: blogapp
+      MYSQL_USER: bloguser
+      MYSQL_PASSWORD: blogpass123
     ports:
-      - "3307:3306"
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - blogapp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "bloguser", "-pblogpass123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   api:
     build:
@@ -22,7 +29,8 @@ services:
     ports:
       - "5174:8080"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - blogapp-network
 

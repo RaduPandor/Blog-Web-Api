@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using BloggerWebApi.Interfaces;
 using BloggerWebApi.Services;
 using Microsoft.AspNetCore.Identity;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,11 +27,18 @@ builder.Services.AddCors(options =>
     });
 });
 
-
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+    options.UseMySql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        new MySqlServerVersion(new Version(8, 0, 42)),
+        mysqlOptions =>
+        {
+            mysqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        }));
 
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
@@ -44,16 +52,22 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
-    try
+    var maxRetries = 5;
+    var delay = TimeSpan.FromSeconds(10);
+    for (int i = 0; i < maxRetries; i++)
     {
-        var context = services.GetRequiredService<AppDbContext>();
-        context.Database.Migrate();
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing the database.");
+        try
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+            break;
+        }
+        catch (MySqlConnector.MySqlException ex)
+        {
+            if (i == maxRetries - 1) throw;
+            Console.WriteLine($"Failed to connect to MySQL: {ex.Message}. Retrying in {delay.TotalSeconds} seconds...");
+            await Task.Delay(delay);
+        }
     }
 }
 
