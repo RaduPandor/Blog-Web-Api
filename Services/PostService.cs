@@ -7,7 +7,7 @@ namespace BloggerWebApi.Services;
 public class PostService : IPostService
 {
     private readonly AppDbContext context;
-   
+
     public PostService(AppDbContext context)
     {
         this.context = context;
@@ -67,10 +67,11 @@ public class PostService : IPostService
     public async Task<bool> DeleteAsync(int id)
     {
         var post = await context.Posts.FindAsync(id);
-        if (post == null){
+        if (post == null)
+        {
             return false;
         }
-            
+
         context.Posts.Remove(post);
         await context.SaveChangesAsync();
         return true;

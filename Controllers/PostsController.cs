@@ -24,9 +24,10 @@ public class PostsController : ControllerBase
     public async Task<ActionResult<Post>> GetPost(int id)
     {
         var post = await postService.GetByIdAsync(id);
-        if (post == null){
+        if (post == null)
+        {
             return NotFound();
-        } 
+        }
         return Ok(post);
     }
 
@@ -41,9 +42,10 @@ public class PostsController : ControllerBase
     public async Task<IActionResult> UpdatePost(int id, Post post)
     {
         var updatedPost = await postService.UpdateAsync(id, post);
-        if (updatedPost == null){
+        if (updatedPost == null)
+        {
             return NotFound();
-        } 
+        }
         return Ok(updatedPost);
     }
 

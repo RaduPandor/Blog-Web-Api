@@ -13,7 +13,7 @@ namespace BloggerWebApi.Services
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
-            var sql = "SELECT Id, Title, Author, SUBSTRING(Content, 1, 20) AS ContentPreview, CreatedDate, LastModifiedDate FROM Posts ORDER BY CreatedDate DESC";      
+            var sql = "SELECT Id, Title, Author, SUBSTRING(Content, 1, 20) AS ContentPreview, CreatedDate, LastModifiedDate FROM Posts ORDER BY CreatedDate DESC";
             await using var conn = context.Database.GetDbConnection();
             await conn.OpenAsync();
 
@@ -26,11 +26,11 @@ namespace BloggerWebApi.Services
             {
                 list.Add(new PostPreviewDto
                 {
-                    Id               = reader.GetInt32(0),
-                    Title            = reader.GetString(1),
-                    Author           = reader.GetString(2),
-                    ContentPreview   = reader.GetString(3),
-                    CreatedDate      = reader.GetDateTime(4),
+                    Id = reader.GetInt32(0),
+                    Title = reader.GetString(1),
+                    Author = reader.GetString(2),
+                    ContentPreview = reader.GetString(3),
+                    CreatedDate = reader.GetDateTime(4),
                     LastModifiedDate = reader.GetDateTime(5)
                 });
             }
@@ -86,8 +86,8 @@ namespace BloggerWebApi.Services
         public async Task<Post?> UpdateAsync(int id, Post updatedPost)
         {
             var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate WHERE Id = @Id";
-            
-            var rowsAffected = await context.Database.ExecuteSqlRawAsync(query, 
+
+            var rowsAffected = await context.Database.ExecuteSqlRawAsync(query,
                 new MySqlParameter("@Title", updatedPost.Title),
                 new MySqlParameter("@Author", updatedPost.Author),
                 new MySqlParameter("@Content", updatedPost.Content),

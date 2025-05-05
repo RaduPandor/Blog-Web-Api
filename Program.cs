@@ -1,8 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using BloggerWebApi.Interfaces;
 using BloggerWebApi.Services;
 using Microsoft.AspNetCore.Identity;
-using System;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +47,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -64,9 +64,41 @@ using (var scope = app.Services.CreateScope())
         }
         catch (MySqlConnector.MySqlException ex)
         {
-            if (i == maxRetries - 1) throw;
+            if (i == maxRetries - 1)
+            {
+                throw;
+            }
             Console.WriteLine($"Failed to connect to MySQL: {ex.Message}. Retrying in {delay.TotalSeconds} seconds...");
             await Task.Delay(delay);
+        }
+    }
+
+    await SeedAdminUser(scope.ServiceProvider);
+}
+
+async Task SeedAdminUser(IServiceProvider serviceProvider)
+{
+    var userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+    string adminRole = "Admin";
+    string adminEmail = "admin@example.com";
+    string adminPassword = "StrongPassword@123";
+
+    if (!await roleManager.RoleExistsAsync(adminRole))
+    {
+        await roleManager.CreateAsync(new IdentityRole(adminRole));
+    }
+
+    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+    if (adminUser == null)
+    {
+        adminUser = new IdentityUser { UserName = "Admin", Email = adminEmail };
+        var result = await userManager.CreateAsync(adminUser, adminPassword);
+
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(adminUser, adminRole);
         }
     }
 }
