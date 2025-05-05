@@ -97,10 +97,10 @@ namespace BloggerWebApi.Services
             if (rowsAffected == 0)
             {
                 return null;
-            } 
+            }
 
             var updatedPostFromDb = await context.Posts
-                .Where(p => p.Id == id)
+                .FromSqlRaw("SELECT * FROM Posts WHERE Id = @Id", new MySqlParameter("@Id", id))
                 .FirstOrDefaultAsync();
 
             return updatedPostFromDb;

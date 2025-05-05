@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using BloggerWebApi.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using System.Threading.Tasks;
 
 namespace BloggerWebApi.Controllers
 {
