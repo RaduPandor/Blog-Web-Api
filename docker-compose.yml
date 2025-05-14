@@ -1,0 +1,32 @@
+services:
+  bloggerwebapi:
+    image: ${DOCKER_REGISTRY-}bloggerwebapi
+    build:
+      context: .
+      dockerfile: BloggerWebApi/Dockerfile
+    ports:
+      - "5174:8080"
+    networks:
+      - blogapp-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: my-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: blogpass123
+      MYSQL_DATABASE: blogapp
+      MYSQL_USER: bloguser
+      MYSQL_PASSWORD: blogpass123
+    ports:
+      - "3306:3306"
+    volumes:
+      - blogapp-mysql-data:/var/lib/mysql
+    networks:
+      - blogapp-network
+
+volumes:
+  blogapp-mysql-data:
+
+networks:
+  blogapp-network:
+    external: true
