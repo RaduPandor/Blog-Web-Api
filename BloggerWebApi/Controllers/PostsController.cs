@@ -1,6 +1,8 @@
 using BloggerWebApi.Dto;
 using BloggerWebApi.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 [Route("api/posts")]
 [ApiController]
@@ -32,16 +34,24 @@ public class PostsController : ControllerBase
     }
 
     [HttpPost]
+    [AllowAnonymous]
     public async Task<ActionResult<Post>> CreatePost(Post post)
     {
-        var created = await postService.CreateAsync(post);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+        var created = await postService.CreateAsync(post, userId);
         return CreatedAtAction(nameof(GetPost), new { id = created.Id }, created);
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdatePost(int id, Post post)
     {
-        var updatedPost = await postService.UpdateAsync(id, post);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var updatedPost = await postService.UpdateAsync(id, post, userId);
         if (updatedPost == null)
         {
             return NotFound();
@@ -49,11 +59,17 @@ public class PostsController : ControllerBase
         return Ok(updatedPost);
     }
 
-
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeletePost(int id)
     {
-        var result = await postService.DeleteAsync(id);
-        return result ? NoContent() : NotFound();
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var result = await postService.DeleteAsync(id, userId);
+        if (!result)
+        {
+            return Forbid();
+        }
+        return NoContent();
     }
+
 }

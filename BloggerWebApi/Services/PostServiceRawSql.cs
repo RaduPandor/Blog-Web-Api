@@ -10,6 +10,7 @@ namespace BloggerWebApi.Services
     public class PostServiceRawSql(AppDbContext context) : IPostService
     {
         private readonly AppDbContext context = context;
+        private readonly IHttpContextAccessor httpContextAccessor;
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
@@ -67,9 +68,9 @@ namespace BloggerWebApi.Services
             return null;
         }
 
-        public async Task<Post> CreateAsync(Post post)
+        public async Task<Post> CreateAsync(Post post, string userId)
         {
-            var sql = "INSERT INTO Posts (Title, Author, Content, CreatedDate, LastModifiedDate) VALUES (@Title, @Author, @Content, @CreatedDate, @LastModifiedDate)";
+            var sql = "INSERT INTO Posts (Title, Author, Content, CreatedDate, LastModifiedDate, UserId) VALUES (@Title, @Author, @Content, @CreatedDate, @LastModifiedDate, @UserId)";
             var command = context.Database.GetDbConnection().CreateCommand();
             command.CommandText = sql;
             command.CommandType = CommandType.Text;
@@ -78,20 +79,22 @@ namespace BloggerWebApi.Services
             command.Parameters.Add(new SqlParameter("@Content", post.Content));
             command.Parameters.Add(new SqlParameter("@CreatedDate", post.CreatedDate));
             command.Parameters.Add(new SqlParameter("@LastModifiedDate", post.LastModifiedDate));
+            command.Parameters.Add(new SqlParameter("@UserId", userId));
             await context.Database.OpenConnectionAsync();
             await command.ExecuteNonQueryAsync();
             return post;
         }
 
-        public async Task<Post?> UpdateAsync(int id, Post updatedPost)
+        public async Task<Post?> UpdateAsync(int id, Post updatedPost, string userId)
         {
-            var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate WHERE Id = @Id";
+            var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate, UserId = @UserId WHERE Id = @Id";
 
             var rowsAffected = await context.Database.ExecuteSqlRawAsync(query,
                 new MySqlParameter("@Title", updatedPost.Title),
                 new MySqlParameter("@Author", updatedPost.Author),
                 new MySqlParameter("@Content", updatedPost.Content),
                 new MySqlParameter("@LastModifiedDate", DateTime.UtcNow),
+                new MySqlParameter("@UserId", userId),
                 new MySqlParameter("@Id", id));
 
             if (rowsAffected == 0)
@@ -106,17 +109,43 @@ namespace BloggerWebApi.Services
             return updatedPostFromDb;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, string userId)
         {
-            var sql = "DELETE FROM Posts WHERE Id = @Id";
-            var command = context.Database.GetDbConnection().CreateCommand();
-            command.CommandText = sql;
-            command.CommandType = CommandType.Text;
-            var idParam = new SqlParameter("@Id", id);
-            command.Parameters.Add(idParam);
-            await context.Database.OpenConnectionAsync();
-            var rowsAffected = await command.ExecuteNonQueryAsync();
-            return rowsAffected > 0;
+            var connection = context.Database.GetDbConnection();
+            await connection.OpenAsync();
+            using (var selectCmd = connection.CreateCommand())
+            {
+                selectCmd.CommandText = "SELECT UserId FROM Posts WHERE Id = @Id";
+                selectCmd.CommandType = CommandType.Text;
+                var idParam = selectCmd.CreateParameter();
+                idParam.ParameterName = "@Id";
+                idParam.Value = id;
+                selectCmd.Parameters.Add(idParam);
+
+                var result = await selectCmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value)
+                    return false;
+
+                var ownerId = (string)result;
+                var user = httpContextAccessor.HttpContext.User;
+                var isAdmin = user.IsInRole("Admin");
+
+                if (ownerId != userId && !isAdmin)
+                    return false;
+            }
+
+            using (var deleteCmd = connection.CreateCommand())
+            {
+                deleteCmd.CommandText = "DELETE FROM Posts WHERE Id = @Id";
+                deleteCmd.CommandType = CommandType.Text;
+                var idParam = deleteCmd.CreateParameter();
+                idParam.ParameterName = "@Id";
+                idParam.Value = id;
+                deleteCmd.Parameters.Add(idParam);
+
+                var rowsAffected = await deleteCmd.ExecuteNonQueryAsync();
+                return rowsAffected > 0;
+            }
         }
     }
 }

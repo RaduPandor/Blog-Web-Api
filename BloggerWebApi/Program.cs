@@ -12,21 +12,18 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        if (allowedOrigins?.Length > 0)
         {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
-        else
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
         }
     });
 });
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
@@ -35,7 +32,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         mysqlOptions =>
         {
             mysqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
+                maxRetryCount: 1,
                 maxRetryDelay: TimeSpan.FromSeconds(10),
                 errorNumbersToAdd: null);
         }));
@@ -57,7 +54,7 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var maxRetries = 5;
+    var maxRetries = 2;
     var delay = TimeSpan.FromSeconds(10);
     for (int i = 0; i < maxRetries; i++)
     {
@@ -137,6 +134,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

@@ -19,12 +19,6 @@
       },
       "publishAllPorts": true,
       "useSSL": false
-    },
-    "frontend": {
-      "commandName": "Executable",
-      "executablePath": "npm",
-      "commandLineArgs": "run dev",
-      "workingDirectory": "..\\Blog-Web-App\\BloggerWebApp"
     }
   },
   "$schema": "http://json.schemastore.org/launchsettings.json"

@@ -17,18 +17,21 @@ public class UserService : IUserService
         var user = new IdentityUser { UserName = username };
         return await userManager.CreateAsync(user, password);
     }
-
     public async Task<IdentityUser?> ValidateUserAsync(string username, string password)
     {
-        var user = await userManager.FindByNameAsync(username);
-        if (user == null)
-        {
-            return null;
-        }
+        var result = await signInManager.PasswordSignInAsync(
+            username,
+            password,
+            isPersistent: false,
+            lockoutOnFailure: false);
 
-        var result = await signInManager.CheckPasswordSignInAsync(user, password, false);
-        return result.Succeeded ? user : null;
+        if (!result.Succeeded)
+            return null;
+
+        return await userManager.FindByNameAsync(username);
     }
+
+
 
     public async Task SignOutAsync()
     {
