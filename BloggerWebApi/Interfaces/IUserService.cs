@@ -9,4 +9,8 @@ public interface IUserService
     Task<IEnumerable<IdentityUser>> GetAllUsersAsync();
     Task<IdentityResult> UpdateUserAsync(string id, string newUsername);
     Task<IdentityResult> DeleteUserAsync(string id);
+    Task<IdentityResult> UpdateUserRoleAsync(string id, string role);
+    Task<string?> GetUserRoleAsync(string userId);
+    Task<IdentityUser?> GetUserByUsernameAsync(string username);
+    Task<IdentityResult> AssignRoleAsync(IdentityUser user, string role);
 }

@@ -15,7 +15,8 @@ public class UserService : IUserService
     public async Task<IdentityResult> RegisterUserAsync(string username, string password)
     {
         var user = new IdentityUser { UserName = username };
-        return await userManager.CreateAsync(user, password);
+        var result = await userManager.CreateAsync(user, password);
+        return result;
     }
     public async Task<IdentityUser?> ValidateUserAsync(string username, string password)
     {
@@ -30,8 +31,6 @@ public class UserService : IUserService
 
         return await userManager.FindByNameAsync(username);
     }
-
-
 
     public async Task SignOutAsync()
     {
@@ -62,9 +61,9 @@ public class UserService : IUserService
             return IdentityResult.Failed(new IdentityError { Description = "User not found." });
         }
 
-        user.UserName = newUsername;
-        return await userManager.UpdateAsync(user);
+        return await userManager.SetUserNameAsync(user, newUsername);
     }
+
 
     public async Task<IdentityResult> DeleteUserAsync(string id)
     {
@@ -76,4 +75,45 @@ public class UserService : IUserService
 
         return await userManager.DeleteAsync(user);
     }
+
+    public async Task<IdentityResult> UpdateUserRoleAsync(string id, string? role)
+    {
+        var user = await userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+        }
+
+        var currentRoles = await userManager.GetRolesAsync(user);
+        if (currentRoles.Any())
+        {
+            var removeResult = await userManager.RemoveFromRolesAsync(user, currentRoles);
+            if (!removeResult.Succeeded)
+            {
+                return removeResult;
+            }
+        }
+
+        string roleToAssign = string.IsNullOrWhiteSpace(role) ? "User" : role;
+        var addResult = await userManager.AddToRoleAsync(user, roleToAssign);
+        return addResult;
+    }
+
+    public async Task<string> GetUserRoleAsync(string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId) ?? throw new InvalidOperationException("User not found");
+        var roles = await userManager.GetRolesAsync(user);
+        return roles.FirstOrDefault() ?? "User";
+    }
+
+    public async Task<IdentityUser?> GetUserByUsernameAsync(string username)
+    {
+        return await userManager.FindByNameAsync(username);
+    }
+
+    public async Task<IdentityResult> AssignRoleAsync(IdentityUser user, string role)
+    {
+        return await userManager.AddToRoleAsync(user, role);
+    }
+
 }

@@ -1,4 +1,6 @@
+using BloggerWebApi.Dto;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BloggerWebApi.Controllers
@@ -34,7 +36,9 @@ namespace BloggerWebApi.Controllers
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto registerDto)
         {
             if (registerDto.Password != registerDto.ConfirmPassword)
+            {
                 return BadRequest("Passwords do not match.");
+            }
 
             var identityResult = await userService.RegisterUserAsync(registerDto.Username, registerDto.Password);
             if (!identityResult.Succeeded)
@@ -42,8 +46,21 @@ namespace BloggerWebApi.Controllers
                 return BadRequest(identityResult.Errors);
             }
 
+            var user = await userService.GetUserByUsernameAsync(registerDto.Username);
+            if (user == null)
+            {
+                return StatusCode(500, "User was created but could not be retrieved.");
+            }
+
+            var roleResult = await userService.AssignRoleAsync(user, "User");
+            if (!roleResult.Succeeded)
+            {
+                return StatusCode(500, new { Message = "User created but role assignment failed", Errors = roleResult.Errors });
+            }
+
             return Ok(new { Message = "Registration successful!", Username = registerDto.Username });
         }
+
 
 
         [HttpPost("logout")]
@@ -71,38 +88,57 @@ namespace BloggerWebApi.Controllers
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await userService.GetAllUsersAsync();
-            if (users == null || !users.Any())
+            var list = new List<UserWithRoleDto>(users.Count());
+
+            foreach (var u in users)
             {
-                return NotFound("No users found.");
+                var role = await userService.GetUserRoleAsync(u.Id);
+                list.Add(new UserWithRoleDto
+                {
+                    Id = u.Id,
+                    Username = u.UserName!,
+                    Role = role
+                });
             }
 
-            return Ok(users.Select(u => new { u.UserName, u.Id }));
+            return Ok(list);
         }
 
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetUserById(string id)
         {
-            var user = await userService.GetUserByIdAsync(id);
-            if (user == null)
+            var u = await userService.GetUserByIdAsync(id);
+            if (u == null)
             {
-                return NotFound("User not found.");
+                return NotFound();
             }
 
-            return Ok(new { user.UserName, user.Id });
+            var role = await userService.GetUserRoleAsync(id);
+            return Ok(new UserWithRoleDto
+            {
+                Id = u.Id,
+                Username = u.UserName!,
+                Role = role
+            });
         }
 
         [HttpPut("{id}")]
-        [Authorize]
-        public async Task<IActionResult> UpdateUser(string id, [FromBody] UserDto updateDto)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUsernameDto dto)
         {
-            var identityResult = await userService.UpdateUserAsync(id, updateDto.Username);
-            if (!identityResult.Succeeded)
+            if (!ModelState.IsValid)
             {
-                return BadRequest(identityResult.Errors);
+                return ValidationProblem(ModelState);
             }
 
-            return Ok(new { Message = "User updated successfully", Username = updateDto.Username });
+            var result = await userService.UpdateUserAsync(id, dto.Username);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors);
+            }
+
+            return Ok();
         }
 
         [HttpDelete("{id}")]
@@ -116,6 +152,45 @@ namespace BloggerWebApi.Controllers
             }
 
             return Ok(new { Message = "User deleted successfully!" });
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser([FromServices] UserManager<IdentityUser> userManager)
+        {
+            var user = await userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var roles = await userManager.GetRolesAsync(user);
+
+            return Ok(new
+            {
+                id = user.Id,
+                userName = user.UserName,
+                roles
+            });
+        }
+
+        [HttpPut("{id}/role")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateUserRole(string id, [FromBody] RoleDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            string roleToAssign = string.IsNullOrWhiteSpace(dto.Role) ? "User" : dto.Role;
+
+            var result = await userService.UpdateUserRoleAsync(id, roleToAssign);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors);
+            }
+            return Ok();
         }
     }
 }

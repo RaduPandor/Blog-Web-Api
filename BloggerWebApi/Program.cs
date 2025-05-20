@@ -83,7 +83,6 @@ async Task SeedAdminUser(IServiceProvider serviceProvider)
     var userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
     var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var config = serviceProvider.GetRequiredService<IConfiguration>();
-
     var adminSection = config.GetSection("AdminUser");
     var adminUserSettings = adminSection.Get<AdminUser>();
 
@@ -95,11 +94,13 @@ async Task SeedAdminUser(IServiceProvider serviceProvider)
         throw new Exception("Admin user settings are incomplete.");
     }
 
-    string adminRole = "Admin";
-
-    if (!await roleManager.RoleExistsAsync(adminRole))
+    var roles = new[] { "Admin", "User" };
+    foreach (var role in roles)
     {
-        await roleManager.CreateAsync(new IdentityRole(adminRole));
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
     }
 
     var adminUser = await userManager.FindByEmailAsync(adminUserSettings.Email);
@@ -116,7 +117,7 @@ async Task SeedAdminUser(IServiceProvider serviceProvider)
 
         if (result.Succeeded)
         {
-            await userManager.AddToRoleAsync(adminUser, adminRole);
+            await userManager.AddToRoleAsync(adminUser, "Admin");
         }
         else
         {
@@ -124,8 +125,6 @@ async Task SeedAdminUser(IServiceProvider serviceProvider)
         }
     }
 }
-
-
 
 if (app.Environment.IsDevelopment())
 {
