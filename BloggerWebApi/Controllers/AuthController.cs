@@ -2,6 +2,7 @@ using BloggerWebApi.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace BloggerWebApi.Controllers
 {
@@ -61,8 +62,6 @@ namespace BloggerWebApi.Controllers
             return Ok(new { Message = "Registration successful!", Username = registerDto.Username });
         }
 
-
-
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
@@ -72,7 +71,7 @@ namespace BloggerWebApi.Controllers
 
         [HttpPost("create")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> CreateUser([FromBody] UserDto createDto)
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserDto createDto)
         {
             var identityResult = await userService.CreateUserAsync(createDto.Username, createDto.Password);
             if (!identityResult.Succeeded)
@@ -80,7 +79,20 @@ namespace BloggerWebApi.Controllers
                 return BadRequest(identityResult.Errors);
             }
 
-            return Ok(new { Message = "User created successfully", Username = createDto.Username });
+            var user = await userService.GetUserByUsernameAsync(createDto.Username);
+            if (user == null)
+            {
+                return StatusCode(500, "User was created but could not be retrieved.");
+            }
+
+            var role = createDto.IsAdmin ? "Admin" : "User";
+            var roleResult = await userService.AssignRoleAsync(user, role);
+            if (!roleResult.Succeeded)
+            {
+                return StatusCode(500, new { Message = "User created but role assignment failed", Errors = roleResult.Errors });
+            }
+
+            return Ok(new { Message = $"User created successfully with role {role}", Username = createDto.Username, UserId = user.Id });
         }
 
         [HttpGet("getall")]
@@ -105,9 +117,15 @@ namespace BloggerWebApi.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> GetUserById(string id)
         {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!User.IsInRole("Admin") && currentUserId != id)
+            {
+                return Forbid();
+            }
+
             var u = await userService.GetUserByIdAsync(id);
             if (u == null)
             {
@@ -124,12 +142,18 @@ namespace BloggerWebApi.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUsernameDto dto)
         {
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
+            }
+
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!User.IsInRole("Admin") && currentUserId != id)
+            {
+                return Forbid();
             }
 
             var result = await userService.UpdateUserAsync(id, dto.Username);
@@ -145,6 +169,12 @@ namespace BloggerWebApi.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteUser(string id)
         {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!User.IsInRole("Admin") && currentUserId != id)
+            {
+                return Forbid();
+            }
+
             var identityResult = await userService.DeleteUserAsync(id);
             if (!identityResult.Succeeded)
             {

@@ -15,20 +15,16 @@ public class UserService : IUserService
     public async Task<IdentityResult> RegisterUserAsync(string username, string password)
     {
         var user = new IdentityUser { UserName = username };
-        var result = await userManager.CreateAsync(user, password);
-        return result;
+        return await userManager.CreateAsync(user, password);
     }
+
     public async Task<IdentityUser?> ValidateUserAsync(string username, string password)
     {
-        var result = await signInManager.PasswordSignInAsync(
-            username,
-            password,
-            isPersistent: false,
-            lockoutOnFailure: false);
-
+        var result = await signInManager.PasswordSignInAsync(username, password, false, false);
         if (!result.Succeeded)
+        {
             return null;
-
+        }
         return await userManager.FindByNameAsync(username);
     }
 
@@ -60,10 +56,8 @@ public class UserService : IUserService
         {
             return IdentityResult.Failed(new IdentityError { Description = "User not found." });
         }
-
         return await userManager.SetUserNameAsync(user, newUsername);
     }
-
 
     public async Task<IdentityResult> DeleteUserAsync(string id)
     {
@@ -72,7 +66,6 @@ public class UserService : IUserService
         {
             return IdentityResult.Failed(new IdentityError { Description = "User not found." });
         }
-
         return await userManager.DeleteAsync(user);
     }
 
@@ -83,20 +76,14 @@ public class UserService : IUserService
         {
             return IdentityResult.Failed(new IdentityError { Description = "User not found." });
         }
-
         var currentRoles = await userManager.GetRolesAsync(user);
         if (currentRoles.Any())
         {
             var removeResult = await userManager.RemoveFromRolesAsync(user, currentRoles);
-            if (!removeResult.Succeeded)
-            {
-                return removeResult;
-            }
+            if (!removeResult.Succeeded) return removeResult;
         }
-
-        string roleToAssign = string.IsNullOrWhiteSpace(role) ? "User" : role;
-        var addResult = await userManager.AddToRoleAsync(user, roleToAssign);
-        return addResult;
+        var roleToAssign = string.IsNullOrWhiteSpace(role) ? "User" : role;
+        return await userManager.AddToRoleAsync(user, roleToAssign);
     }
 
     public async Task<string> GetUserRoleAsync(string userId)
@@ -115,5 +102,4 @@ public class UserService : IUserService
     {
         return await userManager.AddToRoleAsync(user, role);
     }
-
 }

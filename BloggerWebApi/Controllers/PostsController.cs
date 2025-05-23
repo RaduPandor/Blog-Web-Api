@@ -4,72 +4,68 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-[Route("api/posts")]
-[ApiController]
-public class PostsController : ControllerBase
+namespace BloggerWebApi.Controllers
 {
-    private readonly IPostService postService;
-
-    public PostsController(IPostService postService)
+    [Route("api/posts")]
+    [ApiController]
+    public class PostsController : ControllerBase
     {
-        this.postService = postService;
-    }
+        private readonly IPostService postService;
 
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<PostPreviewDto>>> GetPosts()
-    {
-        var posts = await postService.GetAllAsync();
-        return Ok(posts);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Post>> GetPost(int id)
-    {
-        var post = await postService.GetByIdAsync(id);
-        if (post == null)
+        public PostsController(IPostService postService)
         {
-            return NotFound();
+            this.postService = postService;
         }
-        return Ok(post);
-    }
 
-    [HttpPost]
-    [AllowAnonymous]
-    public async Task<ActionResult<Post>> CreatePost(Post post)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<PostPreviewDto>>> GetPosts()
         {
-            return Unauthorized();
+            var posts = await postService.GetAllAsync();
+            return Ok(posts);
         }
-        var created = await postService.CreateAsync(post, userId);
-        return CreatedAtAction(nameof(GetPost), new { id = created.Id }, created);
-    }
 
-    [HttpPut("{id}")]
-    [Authorize]
-    public async Task<IActionResult> UpdatePost(int id, Post post)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var updatedPost = await postService.UpdateAsync(id, post, userId);
-        if (updatedPost == null)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Post>> GetPost(int id)
         {
-            return NotFound();
+            var post = await postService.GetByIdAsync(id);
+            if (post == null)
+            {
+                return NotFound();
+            }
+            return Ok(post);
         }
-        return Ok(updatedPost);
-    }
 
-    [HttpDelete("{id}")]
-    [Authorize]
-    public async Task<IActionResult> DeletePost(int id)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-        var result = await postService.DeleteAsync(id, userId);
-        if (!result)
+        [HttpPost]
+        [Authorize]
+        public async Task<ActionResult<Post>> CreatePost(Post post)
         {
-            return Forbid();
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var created = await postService.CreateAsync(post, userId);
+            return CreatedAtAction(nameof(GetPost), new { id = created.Id }, created);
         }
-        return NoContent();
-    }
 
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdatePost(int id, Post post)
+        {
+            var updatedPost = await postService.UpdateAsync(id, post, User.FindFirstValue(ClaimTypes.NameIdentifier));
+            if (updatedPost == null)
+            {
+                return NotFound();
+            }
+            return Ok(updatedPost);
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize]
+        public async Task<IActionResult> DeletePost(int id)
+        {
+            var result = await postService.DeleteAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier));
+            if (!result)
+            {
+                return Forbid();
+            }
+            return NoContent();
+        }
+    }
 }
