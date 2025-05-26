@@ -37,7 +37,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
                 errorNumbersToAdd: null);
         }));
 
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
@@ -48,7 +48,6 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<AdminUser>(
     builder.Configuration.GetSection("AdminUser"));
-
 
 var app = builder.Build();
 
@@ -80,7 +79,7 @@ using (var scope = app.Services.CreateScope())
 
 async Task SeedAdminUser(IServiceProvider serviceProvider)
 {
-    var userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var config = serviceProvider.GetRequiredService<IConfiguration>();
     var adminSection = config.GetSection("AdminUser");
@@ -106,11 +105,12 @@ async Task SeedAdminUser(IServiceProvider serviceProvider)
     var adminUser = await userManager.FindByEmailAsync(adminUserSettings.Email);
     if (adminUser == null)
     {
-        adminUser = new IdentityUser
+        adminUser = new ApplicationUser
         {
             UserName = adminUserSettings.UserName,
             Email = adminUserSettings.Email,
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            DisplayName = adminUserSettings.UserName
         };
 
         var result = await userManager.CreateAsync(adminUser, adminUserSettings.Password);

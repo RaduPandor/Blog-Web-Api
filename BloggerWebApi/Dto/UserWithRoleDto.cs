@@ -2,9 +2,10 @@
 {
     public class UserWithRoleDto
     {
-        public string Id { get; set; } = default!;
-        public string Username { get; set; } = default!;
-        public string? Role { get; set; }
+        public required string Id { get; set; }
+        public required string Username { get; set; }
+        public required string Role { get; set; }
+        public required string DisplayName { get; set; }
     }
 
 }

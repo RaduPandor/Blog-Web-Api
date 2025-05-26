@@ -16,12 +16,13 @@ namespace BloggerWebApi.Services
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
             return await context.Posts
+                .Include(post => post.AuthorUser)
                 .OrderByDescending(post => post.CreatedDate)
                 .Select(post => new PostPreviewDto
                 {
                     Id = post.Id,
                     Title = post.Title,
-                    Author = post.Author,
+                    Author = post.AuthorUser != null ? post.AuthorUser.DisplayName : post.Author,
                     ContentPreview = post.Content.Length > 20 ? post.Content.Substring(0, 20) + "..." : post.Content,
                     CreatedDate = post.CreatedDate,
                     LastModifiedDate = post.LastModifiedDate
@@ -29,17 +30,30 @@ namespace BloggerWebApi.Services
                 .ToListAsync();
         }
 
-        public async Task<Post?> GetByIdAsync(int id)
+        public async Task<FullPostDto?> GetByIdAsync(int id)
         {
-            return await context.Posts.FindAsync(id);
+            return await context.Posts
+              .Where(p => p.Id == id)
+              .Include(p => p.AuthorUser)
+              .Select(p => new FullPostDto
+              {
+                  Id = p.Id,
+                  Title = p.Title,
+                  Content = p.Content,
+                  Author = p.AuthorUser!.DisplayName,
+                  CreatedDate = p.CreatedDate,
+                  LastModifiedDate = p.LastModifiedDate
+              })
+              .FirstOrDefaultAsync();
         }
+
 
         public async Task<Post> CreateAsync(Post post, string userId)
         {
             var date = DateTime.UtcNow;
             post.CreatedDate = date;
             post.LastModifiedDate = date;
-            post.UserId = userId;
+            post.Author = userId;
             context.Posts.Add(post);
             await context.SaveChangesAsync();
             return post;

@@ -40,9 +40,9 @@ namespace BloggerWebApi.Services
         }
 
 
-        public async Task<Post?> GetByIdAsync(int id)
+        public async Task<FullPostDto?> GetByIdAsync(int id)
         {
-            var sql = "SELECT Id, Title, Author, Content, CreatedDate, LastModifiedDate FROM Posts WHERE Id = @id";
+            var sql = "SELECT Id, Title, COALESCE(u.DisplayName, p.Author) AS Author, Content, CreatedDate, LastModifiedDate FROM Posts WHERE Id = @id";
             var command = context.Database.GetDbConnection().CreateCommand();
             command.CommandText = sql;
             command.CommandType = CommandType.Text;
@@ -53,12 +53,12 @@ namespace BloggerWebApi.Services
             {
                 if (await reader.ReadAsync())
                 {
-                    return new Post
+                    return new FullPostDto
                     {
                         Id = reader.GetInt32(0),
                         Title = reader.GetString(1),
-                        Author = reader.GetString(2),
-                        Content = reader.GetString(3),
+                        Content = reader.GetString(2),
+                        Author = reader.GetString(3),
                         CreatedDate = reader.GetDateTime(4),
                         LastModifiedDate = reader.GetDateTime(5)
                     };

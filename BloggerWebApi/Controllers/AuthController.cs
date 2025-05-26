@@ -1,4 +1,5 @@
 using BloggerWebApi.Dto;
+using BloggerWebApi.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +42,7 @@ namespace BloggerWebApi.Controllers
                 return BadRequest("Passwords do not match.");
             }
 
-            var identityResult = await userService.RegisterUserAsync(registerDto.Username, registerDto.Password);
+            var identityResult = await userService.RegisterUserAsync(registerDto.Username, registerDto.Password, registerDto.DisplayName);
             if (!identityResult.Succeeded)
             {
                 return BadRequest(identityResult.Errors);
@@ -59,7 +60,7 @@ namespace BloggerWebApi.Controllers
                 return StatusCode(500, new { Message = "User created but role assignment failed", Errors = roleResult.Errors });
             }
 
-            return Ok(new { Message = "Registration successful!", Username = registerDto.Username });
+            return Ok(new { Message = "Registration successful!", Username = registerDto.Username, DisplayName = user.DisplayName });
         }
 
         [HttpPost("logout")]
@@ -73,7 +74,7 @@ namespace BloggerWebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserDto createDto)
         {
-            var identityResult = await userService.CreateUserAsync(createDto.Username, createDto.Password);
+            var identityResult = await userService.CreateUserAsync(createDto.Username, createDto.Password, createDto.DisplayName);
             if (!identityResult.Succeeded)
             {
                 return BadRequest(identityResult.Errors);
@@ -92,7 +93,13 @@ namespace BloggerWebApi.Controllers
                 return StatusCode(500, new { Message = "User created but role assignment failed", Errors = roleResult.Errors });
             }
 
-            return Ok(new { Message = $"User created successfully with role {role}", Username = createDto.Username, UserId = user.Id });
+            return Ok(new
+            {
+                Message = $"User created successfully with role {role}",
+                Username = createDto.Username,
+                DisplayName = user.DisplayName,
+                UserId = user.Id
+            });
         }
 
         [HttpGet("getall")]
@@ -109,6 +116,7 @@ namespace BloggerWebApi.Controllers
                 {
                     Id = u.Id,
                     Username = u.UserName!,
+                    DisplayName = u.DisplayName,
                     Role = role
                 });
             }
@@ -137,13 +145,14 @@ namespace BloggerWebApi.Controllers
             {
                 Id = u.Id,
                 Username = u.UserName!,
+                DisplayName = u.DisplayName,
                 Role = role
             });
         }
 
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUsernameDto dto)
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -156,7 +165,25 @@ namespace BloggerWebApi.Controllers
                 return Forbid();
             }
 
-            var result = await userService.UpdateUserAsync(id, dto.Username);
+            IdentityResult result;
+
+            if (!string.IsNullOrWhiteSpace(dto.Username) && !string.IsNullOrWhiteSpace(dto.DisplayName))
+            {
+                result = await userService.UpdateUserAsync(id, dto.Username, dto.DisplayName);
+            }
+            else if (!string.IsNullOrWhiteSpace(dto.Username))
+            {
+                result = await userService.UpdateUserAsync(id, dto.Username);
+            }
+            else if (!string.IsNullOrWhiteSpace(dto.DisplayName))
+            {
+                result = await userService.UpdateDisplayNameAsync(id, dto.DisplayName);
+            }
+            else
+            {
+                return BadRequest("At least one field (Username or DisplayName) must be provided.");
+            }
+
             if (!result.Succeeded)
             {
                 return BadRequest(result.Errors);
@@ -186,7 +213,7 @@ namespace BloggerWebApi.Controllers
 
         [Authorize]
         [HttpGet("me")]
-        public async Task<IActionResult> GetCurrentUser([FromServices] UserManager<IdentityUser> userManager)
+        public async Task<IActionResult> GetCurrentUser([FromServices] UserManager<ApplicationUser> userManager)
         {
             var user = await userManager.GetUserAsync(User);
             if (user == null)
@@ -200,6 +227,7 @@ namespace BloggerWebApi.Controllers
             {
                 id = user.Id,
                 userName = user.UserName,
+                displayName = user.DisplayName,
                 roles
             });
         }
@@ -221,6 +249,42 @@ namespace BloggerWebApi.Controllers
                 return BadRequest(result.Errors);
             }
             return Ok();
+        }
+
+        [HttpPut("editprofile")]
+        [Authorize]
+        public async Task<IActionResult> UpdateProfile([FromBody] RegisterRequestDto dto)
+        {
+            if (!string.IsNullOrWhiteSpace(dto.Password) ||
+                !string.IsNullOrWhiteSpace(dto.ConfirmPassword))
+            {
+                if (dto.Password != dto.ConfirmPassword)
+                {
+                    return BadRequest("Passwords do not match.");
+                }
+                    
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+                var pwResult = await userService.ChangePasswordAsync(userId, dto.Password!);
+                if (!pwResult.Succeeded)
+                {
+                    return BadRequest(pwResult.Errors);
+                }
+            }
+
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var nameResult = await userService.UpdateDisplayNameAsync(currentUserId, dto.DisplayName);
+            if (!nameResult.Succeeded)
+            {
+                return BadRequest(nameResult.Errors);
+            }
+
+            var usernameResult = await userService.UpdateUsernameAsync(currentUserId, dto.Username);
+            if (!usernameResult.Succeeded)
+            {
+                return BadRequest(usernameResult.Errors);
+            }
+
+            return Ok(new { Message = "Profile updated successfully." });
         }
     }
 }
