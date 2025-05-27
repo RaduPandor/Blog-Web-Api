@@ -181,4 +181,14 @@ public class UserService : IUserService
         return await userManager.UpdateAsync(user);
     }
 
+    public async Task<bool> IsUserAdminAsync(string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return false;
+        }
+
+        return await userManager.IsInRoleAsync(user, "Admin");
+    }
 }

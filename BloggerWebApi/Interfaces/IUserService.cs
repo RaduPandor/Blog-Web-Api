@@ -8,7 +8,7 @@ public interface IUserService
     Task<IdentityResult> CreateUserAsync(string username, string password, string? displayName = null);
     Task<ApplicationUser?> GetUserByIdAsync(string id);
     Task<IEnumerable<ApplicationUser>> GetAllUsersAsync();
-    Task<IdentityResult> UpdateUserAsync(string id, string newUsername, string? displayName = null);
+    Task<IdentityResult> UpdateUserAsync(string id, string? username = null, string? displayName = null);
     Task<IdentityResult> UpdateDisplayNameAsync(string id, string displayName);
     Task<IdentityResult> DeleteUserAsync(string id);
     Task<IdentityResult> UpdateUserRoleAsync(string id, string? role);
@@ -17,4 +17,5 @@ public interface IUserService
     Task<IdentityResult> AssignRoleAsync(ApplicationUser user, string role);
     Task<IdentityResult> ChangePasswordAsync(string userId, string newPassword);
     Task<IdentityResult> UpdateUsernameAsync(string userId, string newUsername);
+    Task<bool> IsUserAdminAsync(string userId);
 }

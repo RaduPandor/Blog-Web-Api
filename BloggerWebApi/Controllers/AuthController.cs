@@ -9,7 +9,7 @@ namespace BloggerWebApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController : ControllerBase
+    public class AuthController : BaseController
     {
         private readonly IUserService userService;
 
@@ -154,42 +154,18 @@ namespace BloggerWebApi.Controllers
         [Authorize]
         public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserDto dto)
         {
+            if (!IsAdminOrCurrentUser(id))
+            {
+                return Forbid();
+            }
+
             if (!ModelState.IsValid)
             {
                 return ValidationProblem(ModelState);
             }
 
-            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!User.IsInRole("Admin") && currentUserId != id)
-            {
-                return Forbid();
-            }
-
-            IdentityResult result;
-
-            if (!string.IsNullOrWhiteSpace(dto.Username) && !string.IsNullOrWhiteSpace(dto.DisplayName))
-            {
-                result = await userService.UpdateUserAsync(id, dto.Username, dto.DisplayName);
-            }
-            else if (!string.IsNullOrWhiteSpace(dto.Username))
-            {
-                result = await userService.UpdateUserAsync(id, dto.Username);
-            }
-            else if (!string.IsNullOrWhiteSpace(dto.DisplayName))
-            {
-                result = await userService.UpdateDisplayNameAsync(id, dto.DisplayName);
-            }
-            else
-            {
-                return BadRequest("At least one field (Username or DisplayName) must be provided.");
-            }
-
-            if (!result.Succeeded)
-            {
-                return BadRequest(result.Errors);
-            }
-
-            return Ok();
+            var result = await userService.UpdateUserAsync(id, dto.Username, dto.DisplayName);
+            return result.Succeeded ? Ok() : BadRequest(result.Errors);
         }
 
         [HttpDelete("{id}")]

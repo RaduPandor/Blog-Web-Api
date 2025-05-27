@@ -8,10 +8,12 @@ namespace BloggerWebApi.Services
     public class PostService : IPostService
     {
         private readonly AppDbContext context;
+        private readonly IUserService userService;
 
-        public PostService(AppDbContext context)
+        public PostService(AppDbContext context, IUserService userService)
         {
             this.context = context;
+            this.userService = userService;
         }
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
@@ -61,7 +63,7 @@ namespace BloggerWebApi.Services
             return post;
         }
 
-        public async Task<Post?> UpdateAsync(int id, Post updatedPost, string userId)
+        public async Task<Post?> UpdateAsync(int id, Post updatedPost)
         {
             var existingPost = await context.Posts.FindAsync(id);
             if (existingPost == null)
@@ -78,7 +80,7 @@ namespace BloggerWebApi.Services
             return existingPost;
         }
 
-        public async Task<bool> DeleteAsync(int id, string userId)
+        public async Task<bool> DeleteAsync(int id)
         {
             var post = await context.Posts.FindAsync(id);
             if (post == null)
@@ -89,6 +91,16 @@ namespace BloggerWebApi.Services
             context.Posts.Remove(post);
             await context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<bool> IsOwnerOrAdminAsync(int postId, string userId)
+        {
+            var post = await GetByIdAsync(postId);
+            if (post == null)
+            {
+                return false;
+            }
+            return post.AuthorId == userId || await userService.IsUserAdminAsync(userId);
         }
     }
 }

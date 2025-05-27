@@ -8,7 +8,7 @@ namespace BloggerWebApi.Controllers
 {
     [Route("api/posts")]
     [ApiController]
-    public class PostsController : ControllerBase
+    public class PostsController : BaseController
     {
         private readonly IPostService postService;
 
@@ -48,24 +48,27 @@ namespace BloggerWebApi.Controllers
         [Authorize]
         public async Task<IActionResult> UpdatePost(int id, Post post)
         {
-            var updatedPost = await postService.UpdateAsync(id, post, User.FindFirstValue(ClaimTypes.NameIdentifier));
-            if (updatedPost == null)
+            if (!await postService.IsOwnerOrAdminAsync(id, CurrentUserId))
             {
-                return NotFound();
+                return Forbid();
             }
-            return Ok(updatedPost);
+
+            var updated = await postService.UpdateAsync(id, post);
+            return updated == null ? NotFound() : Ok(updated);
         }
 
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> DeletePost(int id)
         {
-            var result = await postService.DeleteAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier));
-            if (!result)
+            if (!await postService.IsOwnerOrAdminAsync(id, CurrentUserId))
             {
                 return Forbid();
             }
-            return NoContent();
+
+            var success = await postService.DeleteAsync(id);
+            return success ? NoContent() : NotFound();
         }
+
     }
 }

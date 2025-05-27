@@ -11,6 +11,7 @@ namespace BloggerWebApi.Services
     {
         private readonly AppDbContext context = context;
         private readonly IHttpContextAccessor httpContextAccessor;
+        private readonly IUserService userService;
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
@@ -86,7 +87,7 @@ namespace BloggerWebApi.Services
             return post;
         }
 
-        public async Task<Post?> UpdateAsync(int id, Post updatedPost, string userId)
+        public async Task<Post?> UpdateAsync(int id, Post updatedPost)
         {
             var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate, UserId = @UserId WHERE Id = @Id";
 
@@ -95,7 +96,6 @@ namespace BloggerWebApi.Services
                 new MySqlParameter("@Author", updatedPost.Author),
                 new MySqlParameter("@Content", updatedPost.Content),
                 new MySqlParameter("@LastModifiedDate", DateTime.UtcNow),
-                new MySqlParameter("@UserId", userId),
                 new MySqlParameter("@Id", id));
 
             if (rowsAffected == 0)
@@ -110,7 +110,7 @@ namespace BloggerWebApi.Services
             return updatedPostFromDb;
         }
 
-        public async Task<bool> DeleteAsync(int id, string userId)
+        public async Task<bool> DeleteAsync(int id)
         {
             var connection = context.Database.GetDbConnection();
             await connection.OpenAsync();
@@ -131,7 +131,7 @@ namespace BloggerWebApi.Services
                 var user = httpContextAccessor.HttpContext.User;
                 var isAdmin = user.IsInRole("Admin");
 
-                if (ownerId != userId && !isAdmin)
+                if (!isAdmin)
                     return false;
             }
 
@@ -147,6 +147,15 @@ namespace BloggerWebApi.Services
                 var rowsAffected = await deleteCmd.ExecuteNonQueryAsync();
                 return rowsAffected > 0;
             }
+        }
+        public async Task<bool> IsOwnerOrAdminAsync(int postId, string userId)
+        {
+            var post = await GetByIdAsync(postId);
+            if (post == null)
+            {
+                return false;
+            }
+            return post.AuthorId == userId || await userService.IsUserAdminAsync(userId);
         }
     }
 }
