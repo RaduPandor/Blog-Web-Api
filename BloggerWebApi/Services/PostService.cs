@@ -1,6 +1,7 @@
 using BloggerWebApi.Dto;
 using BloggerWebApi.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 namespace BloggerWebApi.Services
 {
@@ -23,7 +24,7 @@ namespace BloggerWebApi.Services
                     Id = post.Id,
                     Title = post.Title,
                     Author = post.AuthorUser != null ? post.AuthorUser.DisplayName : post.Author,
-                    ContentPreview = post.Content.Length > 20 ? post.Content.Substring(0, 20) + "..." : post.Content,
+                    ContentPreview = post.Content.Length > 150 ? post.Content.Substring(0, 150) + "..." : post.Content,
                     CreatedDate = post.CreatedDate,
                     LastModifiedDate = post.LastModifiedDate
                 })
@@ -41,6 +42,7 @@ namespace BloggerWebApi.Services
                   Title = p.Title,
                   Content = p.Content,
                   Author = p.AuthorUser!.DisplayName,
+                  AuthorId = p.AuthorUser.Id,
                   CreatedDate = p.CreatedDate,
                   LastModifiedDate = p.LastModifiedDate
               })
@@ -68,7 +70,6 @@ namespace BloggerWebApi.Services
             }
 
             existingPost.Title = updatedPost.Title;
-            existingPost.Author = updatedPost.Author;
             existingPost.Content = updatedPost.Content;
             existingPost.LastModifiedDate = DateTime.UtcNow;
 
