@@ -1,161 +1,199 @@
 using BloggerWebApi.Dto;
 using BloggerWebApi.Interfaces;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
-using System.Data;
+using System.Data.Common;
 
 namespace BloggerWebApi.Services
 {
-    public class PostServiceRawSql(AppDbContext context) : IPostService
+    // Same behaviour as PostService, but with hand-written SQL instead of LINQ.
+    // To use it, register it in Program.cs instead of PostService:
+    // builder.Services.AddScoped<IPostService, PostServiceRawSql>();
+    public class PostServiceRawSql(AppDbContext context, IUserService userService) : IPostService
     {
         private readonly AppDbContext context = context;
-        private readonly IHttpContextAccessor httpContextAccessor;
-        private readonly IUserService userService;
+        private readonly IUserService userService = userService;
 
         public async Task<IEnumerable<PostPreviewDto>> GetAllAsync()
         {
-            var sql = "SELECT Id, Title, Author, SUBSTRING(Content, 1, 150) AS ContentPreview, CreatedDate, LastModifiedDate FROM Posts ORDER BY CreatedDate DESC";
-            await using var conn = context.Database.GetDbConnection();
-            await conn.OpenAsync();
+            const string sql = @"
+                SELECT p.Id,
+                       p.Title,
+                       COALESCE(u.DisplayName, p.Author) AS Author,
+                       CASE WHEN CHAR_LENGTH(p.Content) > 150
+                            THEN CONCAT(SUBSTRING(p.Content, 1, 150), '...')
+                            ELSE p.Content
+                       END AS ContentPreview,
+                       p.CreatedDate,
+                       p.LastModifiedDate
+                FROM Posts p
+                LEFT JOIN AspNetUsers u ON u.Id = p.Author
+                ORDER BY p.CreatedDate DESC";
 
-            var command = context.Database.GetDbConnection().CreateCommand();
-            command.CommandText = sql;
-            command.CommandType = CommandType.Text;
-            var list = new List<PostPreviewDto>();
-            await using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            return await ExecuteAsync(sql, async command =>
             {
-                list.Add(new PostPreviewDto
+                var posts = new List<PostPreviewDto>();
+                await using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
                 {
-                    Id = reader.GetInt32(0),
-                    Title = reader.GetString(1),
-                    Author = reader.GetString(2),
-                    ContentPreview = reader.GetString(3),
-                    CreatedDate = reader.GetDateTime(4),
-                    LastModifiedDate = reader.GetDateTime(5)
-                });
-            }
-
-            return list;
-        }
-
-
-        public async Task<FullPostDto?> GetByIdAsync(int id)
-        {
-            var sql = "SELECT Id, Title, COALESCE(u.DisplayName, p.Author) AS Author, Content, CreatedDate, LastModifiedDate FROM Posts WHERE Id = @id";
-            var command = context.Database.GetDbConnection().CreateCommand();
-            command.CommandText = sql;
-            command.CommandType = CommandType.Text;
-            var idParam = new SqlParameter("@id", id);
-            command.Parameters.Add(idParam);
-            await context.Database.OpenConnectionAsync();
-            using (var reader = await command.ExecuteReaderAsync())
-            {
-                if (await reader.ReadAsync())
-                {
-                    return new FullPostDto
+                    posts.Add(new PostPreviewDto
                     {
                         Id = reader.GetInt32(0),
                         Title = reader.GetString(1),
-                        Content = reader.GetString(2),
-                        Author = reader.GetString(3),
-                        AuthorId = reader.GetString(3),
+                        Author = reader.GetString(2),
+                        ContentPreview = reader.GetString(3),
                         CreatedDate = reader.GetDateTime(4),
                         LastModifiedDate = reader.GetDateTime(5)
-                    };
+                    });
                 }
-            }
 
-            return null;
+                return posts;
+            });
+        }
+
+        public async Task<FullPostDto?> GetByIdAsync(int id)
+        {
+            const string sql = @"
+                SELECT p.Id, p.Title, p.Content, u.DisplayName, p.Author, p.CreatedDate, p.LastModifiedDate
+                FROM Posts p
+                INNER JOIN AspNetUsers u ON u.Id = p.Author
+                WHERE p.Id = @Id";
+
+            return await ExecuteAsync(sql, async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                {
+                    return null;
+                }
+
+                return new FullPostDto
+                {
+                    Id = reader.GetInt32(0),
+                    Title = reader.GetString(1),
+                    Content = reader.GetString(2),
+                    Author = reader.GetString(3),
+                    AuthorId = reader.GetString(4),
+                    CreatedDate = reader.GetDateTime(5),
+                    LastModifiedDate = reader.GetDateTime(6)
+                };
+            }, ("@Id", id));
         }
 
         public async Task<Post> CreateAsync(Post post, string userId)
         {
-            var sql = "INSERT INTO Posts (Title, Author, Content, CreatedDate, LastModifiedDate, UserId) VALUES (@Title, @Author, @Content, @CreatedDate, @LastModifiedDate, @UserId)";
-            var command = context.Database.GetDbConnection().CreateCommand();
-            command.CommandText = sql;
-            command.CommandType = CommandType.Text;
-            command.Parameters.Add(new SqlParameter("@Title", post.Title));
-            command.Parameters.Add(new SqlParameter("@Author", post.Author));
-            command.Parameters.Add(new SqlParameter("@Content", post.Content));
-            command.Parameters.Add(new SqlParameter("@CreatedDate", post.CreatedDate));
-            command.Parameters.Add(new SqlParameter("@LastModifiedDate", post.LastModifiedDate));
-            command.Parameters.Add(new SqlParameter("@UserId", userId));
-            await context.Database.OpenConnectionAsync();
-            await command.ExecuteNonQueryAsync();
+            const string sql = @"
+                INSERT INTO Posts (Title, Author, Content, CreatedDate, LastModifiedDate)
+                VALUES (@Title, @Author, @Content, @CreatedDate, @LastModifiedDate);
+                SELECT LAST_INSERT_ID();";
+
+            var now = DateTime.UtcNow;
+            post.Author = userId;
+            post.CreatedDate = now;
+            post.LastModifiedDate = now;
+
+            post.Id = await ExecuteAsync(sql, async command =>
+                Convert.ToInt32(await command.ExecuteScalarAsync()),
+                ("@Title", post.Title),
+                ("@Author", post.Author),
+                ("@Content", post.Content),
+                ("@CreatedDate", post.CreatedDate),
+                ("@LastModifiedDate", post.LastModifiedDate));
+
             return post;
         }
 
         public async Task<Post?> UpdateAsync(int id, Post updatedPost)
         {
-            var query = "UPDATE Posts SET Title = @Title, Author = @Author, Content = @Content, LastModifiedDate = @LastModifiedDate, UserId = @UserId WHERE Id = @Id";
+            const string updateSql = @"
+                UPDATE Posts
+                SET Title = @Title, Content = @Content, LastModifiedDate = @LastModifiedDate
+                WHERE Id = @Id";
 
-            var rowsAffected = await context.Database.ExecuteSqlRawAsync(query,
-                new MySqlParameter("@Title", updatedPost.Title),
-                new MySqlParameter("@Author", updatedPost.Author),
-                new MySqlParameter("@Content", updatedPost.Content),
-                new MySqlParameter("@LastModifiedDate", DateTime.UtcNow),
-                new MySqlParameter("@Id", id));
+            var rowsAffected = await ExecuteAsync(updateSql, command => command.ExecuteNonQueryAsync(),
+                ("@Title", updatedPost.Title),
+                ("@Content", updatedPost.Content),
+                ("@LastModifiedDate", DateTime.UtcNow),
+                ("@Id", id));
 
             if (rowsAffected == 0)
             {
                 return null;
             }
 
-            var updatedPostFromDb = await context.Posts
-                .FromSqlRaw("SELECT * FROM Posts WHERE Id = @Id", new MySqlParameter("@Id", id))
-                .FirstOrDefaultAsync();
+            const string selectSql = @"
+                SELECT Id, Title, Author, Content, CreatedDate, LastModifiedDate
+                FROM Posts
+                WHERE Id = @Id";
 
-            return updatedPostFromDb;
+            return await ExecuteAsync(selectSql, async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                {
+                    return null;
+                }
+
+                return new Post
+                {
+                    Id = reader.GetInt32(0),
+                    Title = reader.GetString(1),
+                    Author = reader.GetString(2),
+                    Content = reader.GetString(3),
+                    CreatedDate = reader.GetDateTime(4),
+                    LastModifiedDate = reader.GetDateTime(5)
+                };
+            }, ("@Id", id));
         }
 
         public async Task<bool> DeleteAsync(int id)
         {
-            var connection = context.Database.GetDbConnection();
-            await connection.OpenAsync();
-            using (var selectCmd = connection.CreateCommand())
-            {
-                selectCmd.CommandText = "SELECT UserId FROM Posts WHERE Id = @Id";
-                selectCmd.CommandType = CommandType.Text;
-                var idParam = selectCmd.CreateParameter();
-                idParam.ParameterName = "@Id";
-                idParam.Value = id;
-                selectCmd.Parameters.Add(idParam);
+            // Permission is checked in PostsController via IsOwnerOrAdminAsync before this runs.
+            const string sql = "DELETE FROM Posts WHERE Id = @Id";
 
-                var result = await selectCmd.ExecuteScalarAsync();
-                if (result == null || result == DBNull.Value)
-                    return false;
-
-                var ownerId = (string)result;
-                var user = httpContextAccessor.HttpContext.User;
-                var isAdmin = user.IsInRole("Admin");
-
-                if (!isAdmin)
-                    return false;
-            }
-
-            using (var deleteCmd = connection.CreateCommand())
-            {
-                deleteCmd.CommandText = "DELETE FROM Posts WHERE Id = @Id";
-                deleteCmd.CommandType = CommandType.Text;
-                var idParam = deleteCmd.CreateParameter();
-                idParam.ParameterName = "@Id";
-                idParam.Value = id;
-                deleteCmd.Parameters.Add(idParam);
-
-                var rowsAffected = await deleteCmd.ExecuteNonQueryAsync();
-                return rowsAffected > 0;
-            }
+            var rowsAffected = await ExecuteAsync(sql, command => command.ExecuteNonQueryAsync(), ("@Id", id));
+            return rowsAffected > 0;
         }
+
         public async Task<bool> IsOwnerOrAdminAsync(int postId, string userId)
         {
-            var post = await GetByIdAsync(postId);
-            if (post == null)
+            const string sql = "SELECT Author FROM Posts WHERE Id = @Id";
+
+            var authorId = await ExecuteAsync(sql, async command =>
+                await command.ExecuteScalarAsync() as string,
+                ("@Id", postId));
+
+            if (authorId == null)
             {
                 return false;
             }
-            return post.AuthorId == userId || await userService.IsUserAdminAsync(userId);
+
+            return authorId == userId || await userService.IsUserAdminAsync(userId);
+        }
+
+        // Runs one command on the DbContext's own connection.
+        // EF owns that connection, so we open and close it through EF and never dispose it ourselves.
+        private async Task<T> ExecuteAsync<T>(string sql, Func<DbCommand, Task<T>> run, params (string Name, object? Value)[] parameters)
+        {
+            await context.Database.OpenConnectionAsync();
+            try
+            {
+                await using var command = context.Database.GetDbConnection().CreateCommand();
+                command.CommandText = sql;
+
+                foreach (var (name, value) in parameters)
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = name;
+                    parameter.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(parameter);
+                }
+
+                return await run(command);
+            }
+            finally
+            {
+                await context.Database.CloseConnectionAsync();
+            }
         }
     }
 }
